@@ -4,6 +4,7 @@ import (
 	"log"
 
 	"movie-reservation/internal/db"
+	"movie-reservation/internal/routes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -28,5 +29,6 @@ func main() {
 	})
 
 	log.Printf("Server is running on :8080")
+	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
 }
