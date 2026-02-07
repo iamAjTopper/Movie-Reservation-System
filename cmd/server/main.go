@@ -28,6 +28,13 @@ func main() {
 		})
 	})
 
+	r.GET("/me", routes.AuthMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"user_id": c.GetInt("user_id"),
+			"role":    c.GetString("role"),
+		})
+	})
+
 	log.Printf("Server is running on :8080")
 	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
