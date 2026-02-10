@@ -68,3 +68,30 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// onlt admin middleware
+func AdminOnlyMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 1. Retrieve the role from the "Backpack" (Context).
+		// Remember: The AuthMiddleware ran BEFORE this.
+		// It already unpacked the token and put "role" into 'c'.
+		role, exists := c.Get("role")
+
+		// 2. The Double Check.
+		// First: "Did the previous middleware even run?" (!exists)
+		// Second: "Is the role exactly 'ADMIN'?" (role != "ADMIN")
+		if !exists || role != "ADMIN" {
+			// 3. The Rejection.
+			// 403 Forbidden means: "I know who you are, but you aren't allowed here."
+			// (Compare this to 401 Unauthorized, which means "I don't know who you are".)
+
+			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "admin access required"})
+			return
+		}
+
+		// 4. The Approval.
+		// If they are an ADMIN, let them pass to the next function.
+		c.Next()
+
+	}
+}

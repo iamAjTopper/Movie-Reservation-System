@@ -35,6 +35,12 @@ func main() {
 		})
 	})
 
+	r.GET("/admin/test", routes.AuthMiddleware(), routes.AdminOnlyMiddleware(), func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"message": "welcome admin",
+		})
+	})
+
 	log.Printf("Server is running on :8080")
 	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
