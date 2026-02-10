@@ -22,6 +22,8 @@ func RegisterMovieRoutes(r *gin.Engine) {
 	r.POST("/movies", AuthMiddleware(), AdminOnlyMiddleware(), createMovie)
 
 	r.PUT("/movies/:id", AuthMiddleware(), AdminOnlyMiddleware(), updateMovie)
+
+	r.DELETE("/movies/:id", AuthMiddleware(), AdminOnlyMiddleware(), deleteMovie)
 }
 
 func createMovie(c *gin.Context) {
@@ -169,4 +171,41 @@ func updateMovie(c *gin.Context) {
 
 	// 5. Success
 	c.JSON(http.StatusOK, gin.H{"message": "movie updated"})
+}
+
+func deleteMovie(c *gin.Context) {
+	// 1. Identify the Target.
+	// We grab the ID from the URL (e.g., "/movies/5").
+	id := c.Param("id")
+
+	// 2. The Attempt (Fire and Forget).
+	// We run the DELETE command immediately.
+	// Note: In SQL, if you try to delete ID 999 and it doesn't exist,
+	// it is NOT an error! The database just says "Command successful, 0 items removed."
+	result, err := db.DB.Exec(
+		`DELETE FROM movies WHERE id = $1`,
+		id,
+	)
+
+	// 3. Technical Error Check.
+	// This only catches serious problems (e.g., DB is offline, SQL syntax error).
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 4. The "Ghost" Check (Crucial Step).
+	// Since SQL doesn't error on missing IDs, we must manually ask:
+	// "How many rows were actually touched by that last command?"
+	rows, _ := result.RowsAffected()
+
+	// 5. The Verdict.
+	// If 0 rows were touched, it means the movie ID didn't exist in the first place.
+	if rows == 0 {
+		c.JSON(http.StatusNotFound, gin.H{"error": "movie not found"})
+		return
+	}
+
+	//6. Success
+	c.JSON(http.StatusOK, gin.H{"message": "movie deleted"})
 }
