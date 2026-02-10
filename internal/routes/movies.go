@@ -20,6 +20,8 @@ func RegisterMovieRoutes(r *gin.Engine) {
 
 	//admin
 	r.POST("/movies", AuthMiddleware(), AdminOnlyMiddleware(), createMovie)
+
+	r.PUT("/movies/:id", AuthMiddleware(), AdminOnlyMiddleware(), updateMovie)
 }
 
 func createMovie(c *gin.Context) {
@@ -115,4 +117,56 @@ func listMovies(c *gin.Context) {
 	// 8. The Delivery: Serve the full list.
 	// We send the entire slice back to the user with a 200 OK status.
 	c.JSON(http.StatusOK, movies)
+}
+
+func updateMovie(c *gin.Context) {
+	// 1. Capture the Target.
+	// We expect the URL to look like "/admin/movies/5".
+	// c.Param("id") grabs that "5" so we know WHICH movie to update.
+	id := c.Param("id")
+
+	// 2. Capture the New Data.
+	// We reuse the 'createMovieRequest' struct because the data fields (Title, Genre) are the same.
+	var req createMovieRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
+		return
+	}
+
+	// 3. The Safety Check (Verification).
+	// Before we try to update, let's make sure the movie actually exists.
+	// "SELECT EXISTS" is a very fast SQL query that returns true/false.
+	var exists bool
+	err := db.DB.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM movies WHERE id =$1)`,
+		id,
+	).Scan(&exists)
+
+	// If the DB crashes (err) or the movie isn't there (!exists), stop.
+	if err != nil || !exists {
+		c.JSON(http.StatusNotFound, gin.H{"error": "movie not found"})
+		return
+	}
+
+	// 4. The Update (Execution).
+	// We use the SQL UPDATE command.
+	// Notice the WHERE clause at the end—without it, you would overwrite EVERY movie in your database!
+	_, err = db.DB.Exec(
+		`UPDATE movies
+		SET title = $1, description = $2, genre = $3, poster_url = $4
+		WHERE id = $5`,
+		req.Title,
+		req.Description,
+		req.Genre,
+		req.PosterURL,
+		id,
+	)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	// 5. Success
+	c.JSON(http.StatusOK, gin.H{"message": "movie updated"})
 }
