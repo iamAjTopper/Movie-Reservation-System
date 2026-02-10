@@ -40,6 +40,7 @@ func main() {
 			"message": "welcome admin",
 		})
 	})
+	routes.RegisterMovieRoutes(r)
 
 	log.Printf("Server is running on :8080")
 	routes.RegisterAuthRoutes(r)
