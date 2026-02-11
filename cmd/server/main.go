@@ -42,6 +42,8 @@ func main() {
 	})
 	routes.RegisterMovieRoutes(r)
 
+	routes.RegisterShowTimeRoutes(r)
+
 	log.Printf("Server is running on :8080")
 	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
