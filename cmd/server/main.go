@@ -46,6 +46,8 @@ func main() {
 
 	routes.RegisterSeatRoutes(r)
 
+	routes.RegisterReservationRoutes(r)
+
 	log.Printf("Server is running on :8080")
 	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
