@@ -16,6 +16,8 @@ func RegisterReservationRoutes(r *gin.Engine) {
 	r.POST("/showtimes/:id/reservations", AuthMiddleware(), createReservation)
 
 	r.GET("/me/reservations", AuthMiddleware(), listUserReservations)
+
+	r.PUT("/reservations/:id/cancel", AuthMiddleware(), cancelReservation)
 }
 
 func createReservation(c *gin.Context) {
@@ -157,4 +159,66 @@ func listUserReservations(c *gin.Context) {
 	// 5. Send the Report
 
 	c.JSON(http.StatusOK, results)
+}
+
+func cancelReservation(c *gin.Context) {
+	// 1. Identify the Target
+	// Which reservation are we cancelling? (from URL)
+	resID := c.Param("id")
+	// Who is asking? (from Token)
+	userID := c.GetInt("user_id")
+
+	// 2. Gather Evidence (The Validation Query)
+	// Before we do anything, we need to look up the reservation details.
+	// We need to know:
+	//   a. When is the movie? (showtimeTime) - Used for policy checks (e.g., can't cancel if movie started).
+	//   b. Who owns it? (ownerID) - Security check.
+	//   c. What is the current status? (status) - Logic check.
+	var showtimeTime string
+	var ownerID int
+	var status string
+
+	err := db.DB.QueryRow(`
+		SELECT s.start_time, r.user_id, r.status
+		FROM reservations r
+		JOIN showtimes s ON s.id = r.showtime_id
+		WHERE r.id = $1
+		`, resID).Scan(&showtimeTime, &ownerID, &status)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "reservastion not found"})
+		return
+	}
+
+	// 3. The Security Check ("Is this yours?")
+	// If the ID on the ticket (ownerID) doesn't match the ID in the token (userID),
+	// it means Hacker Bob is trying to cancel Alice's ticket. Block them.
+	if ownerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "not your reservation"})
+		return
+	}
+
+	// 4. The Logic Check ("Is it valid?")
+	// You can't cancel a ticket that is already cancelled or refunded.
+	if status != "BOOKED" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannnot cancel"})
+		return
+	}
+
+	// 5. The Action (Soft Delete)
+	// We do NOT use "DELETE FROM". We use "UPDATE".
+	// Why? Because accountants need records! We want to keep the history that
+	// "User X booked this, then cancelled it."
+	_, err = db.DB.Exec(`
+		UPDATE reservations
+		SET status = 'CANCELLED'
+		WHERE id = $1
+		`, resID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to cancel"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "reservation cancelled"})
 }
