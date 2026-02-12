@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"time"
 
 	"movie-reservation/internal/db"
 
@@ -38,6 +39,24 @@ func createReservation(c *gin.Context) {
 	// You can't buy 0 tickets.
 	if len(req.SeatIDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no seats selected"})
+		return
+	}
+	//preventing booking pastime shows
+	var startTime time.Time
+
+	err := db.DB.QueryRow(`
+		SELECT start_time
+		FROM showtimes
+		WHERE id =$1
+		`, showtimeID).Scan(&startTime)
+
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "showtime not found"})
+		return
+	}
+
+	if startTime.Before(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "cannot book past showtime"})
 		return
 	}
 
@@ -174,7 +193,7 @@ func cancelReservation(c *gin.Context) {
 	//   a. When is the movie? (showtimeTime) - Used for policy checks (e.g., can't cancel if movie started).
 	//   b. Who owns it? (ownerID) - Security check.
 	//   c. What is the current status? (status) - Logic check.
-	var showtimeTime string
+	var showtimeTime time.Time
 	var ownerID int
 	var status string
 
@@ -187,6 +206,14 @@ func cancelReservation(c *gin.Context) {
 
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "reservastion not found"})
+		return
+	}
+
+	//fixing cancel past showtime
+	if showtimeTime.Before(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "cannot cancel past showtimes",
+		})
 		return
 	}
 
