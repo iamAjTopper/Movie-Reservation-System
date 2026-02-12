@@ -14,6 +14,8 @@ type createReservationRequest struct {
 
 func RegisterReservationRoutes(r *gin.Engine) {
 	r.POST("/showtimes/:id/reservations", AuthMiddleware(), createReservation)
+
+	r.GET("/me/reservations", AuthMiddleware(), listUserReservations)
 }
 
 func createReservation(c *gin.Context) {
@@ -102,4 +104,57 @@ func createReservation(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{
 		"reservation_id": reservationID,
 	})
+}
+
+func listUserReservations(c *gin.Context) {
+
+	// 1. Identity Check: "Who is asking?"
+	// We trust the AuthMiddleware. It already checked the token and put the ID here.
+	userID := c.GetInt("user_id")
+
+	// 2. The "Reporter" Query: Gather data from 3 different places.
+	rows, err := db.DB.Query(`
+		SELECT 
+			r.id, 		--reservation ticket #
+			m.title,	--Movie Name(from movies table)
+			s.start_time,--Time (from showtimes table)
+			r.status	--"BOOKED" or "CANCELLED"
+		FROM reservations r
+		JOIN showtimes s ON s.id = r.showtime_id --Connect Ticket -> Time
+		JOIN movies m ON m.id = s.movie_id		 --Connect Time -> Movie Name
+		WHERE r.user_id = $1					 --Filter: Only showe this user's ticket
+		ORDER BY r.created_at DESC				 --Sort : Show newest booking at the top
+		`, userID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	defer rows.Close()
+
+	// 3. The Empty List: Prepare a container for the results.
+	var results []gin.H
+
+	// 4. The Loop: Process the pile of receipts one by one.
+	for rows.Next() {
+		var id int
+		var title string
+		var startTime string
+		var status string
+
+		// Scan the 4 columns we asked for in the SELECT statement.
+		rows.Scan(&id, &title, &startTime, &status)
+
+		// Add to our list
+		results = append(results, gin.H{
+			"reservation_id": id,
+			"movie_title":    title,
+			"start_time":     startTime,
+			"status":         status,
+		})
+	}
+
+	// 5. Send the Report
+
+	c.JSON(http.StatusOK, results)
 }
