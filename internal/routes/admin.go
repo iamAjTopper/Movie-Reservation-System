@@ -11,7 +11,7 @@ func AdminReportsRoutes(r *gin.Engine) {
 }
 
 func adminReport(c *gin.Context) {
-	// 1. Run the "Big Picture" Query
+	// 1 Run the "Big Picture" Query
 	rows, err := db.DB.Query(`
 		SELECT
 			m.title,
@@ -38,15 +38,14 @@ func adminReport(c *gin.Context) {
 
 	var report []gin.H
 
-	// 2. Process the Results
+	// 2 Processing the Results
 	for rows.Next() {
 		var title string
 		var startTime string
 		var seatsSold int
 		var revenue float64
 
-		// 3. Scan the Data
-		// Note: If your DB 'price' is NUMERIC, Go might want 'float64' for revenue.
+		// 3 Scanning the Data
 		rows.Scan(&title, &startTime, &seatsSold, &revenue)
 
 		report = append(report, gin.H{

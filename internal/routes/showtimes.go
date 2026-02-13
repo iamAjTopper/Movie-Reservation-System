@@ -25,12 +25,11 @@ func RegisterShowTimeRoutes(r *gin.Engine) {
 }
 
 func createShowtime(c *gin.Context) {
-	// 1. Context: "Which movie are we scheduling?"
-	// We grab the ID from the URL (e.g., /movies/5/showtimes).
-	// This links the new showtime to Movie #5.
+	// 1 Context:Which movie are we scheduling?
+
 	movieID := c.Param("id")
 
-	// 2. Data: "When is it playing?"
+	// 2 Data: When is it playing?
 	var req createShowtimeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
@@ -89,8 +88,8 @@ func createShowtime(c *gin.Context) {
 		})
 		return
 	}
-	// 3. Execution: Create the link.
-	// We insert a row that connects the movie_id (URL) with the times (Body).
+	// 3 Execution: Creating the link.
+	// We insert a row that connects the movie_id (URL) with the times (Body)
 	_, err = db.DB.Exec(
 		`INSERT INTO showtimes (movie_id, start_time, end_time, price)
 		VALUES ($1, $2, $3, $4)`,
@@ -100,15 +99,12 @@ func createShowtime(c *gin.Context) {
 		req.Price,
 	)
 
-	// 4. Validation Check (The "Foreign Key" Check).
-	// If movieID #5 doesn't exist in the 'movies' table, Postgres will reject this
-	// and return an error. This keeps your data clean.
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// 5. Success
+	// 5 Success
 	c.JSON(http.StatusCreated, gin.H{"message": "showtime created"})
 }
 

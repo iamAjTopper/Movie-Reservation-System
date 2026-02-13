@@ -22,12 +22,14 @@ func main() {
 
 	r := gin.Default()
 
+	// Health
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"status": "ok",
 		})
 	})
 
+	// Basic test routes
 	r.GET("/me", routes.AuthMiddleware(), func(c *gin.Context) {
 		c.JSON(200, gin.H{
 			"user_id": c.GetInt("user_id"),
@@ -35,22 +37,35 @@ func main() {
 		})
 	})
 
-	r.GET("/admin/test", routes.AuthMiddleware(), routes.AdminOnlyMiddleware(), func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"message": "welcome admin",
-		})
-	})
+	r.GET("/admin/test",
+		routes.AuthMiddleware(),
+		routes.AdminOnlyMiddleware(),
+		func(c *gin.Context) {
+			c.JSON(200, gin.H{
+				"message": "welcome admin",
+			})
+		},
+	)
+
+	// 🔐 Auth
+	routes.RegisterAuthRoutes(r)
+
+	// 🎬 Movies
 	routes.RegisterMovieRoutes(r)
 
+	// 🕒 Showtimes
 	routes.RegisterShowTimeRoutes(r)
 
+	// 🎟 Seats
 	routes.RegisterSeatRoutes(r)
 
+	// 🎫 Reservations
 	routes.RegisterReservationRoutes(r)
 
+	// 👑 Admin
 	routes.AdminReportsRoutes(r)
+	routes.AdminUserRoutes(r)
 
 	log.Printf("Server is running on :8080")
-	routes.RegisterAuthRoutes(r)
 	r.Run(":8080")
 }

@@ -22,20 +22,20 @@ func RegisterReservationRoutes(r *gin.Engine) {
 }
 
 func createReservation(c *gin.Context) {
-	// 1. Get the Context
+	// 1 Get the Context
 	// Who is buying? (userID from the token)
 	// What movie? (showtimeID from the URL)
 	showtimeID := c.Param("id")
 	userID := c.GetInt("user_id")
 
-	// 2. Get the Cart (The specific seats they want)
+	// 2 Get the Cart (The specific seats they want)
 	var req createReservationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request"})
 		return
 	}
 
-	// 3. Validation
+	// 3 Validation
 	// You can't buy 0 tickets.
 	if len(req.SeatIDs) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no seats selected"})
@@ -66,8 +66,8 @@ func createReservation(c *gin.Context) {
 	}
 	defer tx.Rollback()
 
-	// 4. The Availability Check (The Flaw is Here)
-	// The code loops through every seat the user wants (e.g., Seat 1, Seat 2).
+	// 4 The Availability Check
+	// The code loops through every seat the user wants (e.g., Seat 1, Seat 2)
 	// For each seat, it asks the database: "Is this seat taken?"
 	for _, seatID := range req.SeatIDs {
 		var available bool
@@ -90,8 +90,8 @@ func createReservation(c *gin.Context) {
 		}
 	}
 
-	// 5. Create the Receipt (Reservation Record)
-	// If the loop finished, the code assumes all seats are free.
+	// 5 Creating the Receipt (Reservation Record
+	// If the loop finished, the code assumes all seats are free
 	// It creates a new Reservation ID (e.g., #505)
 	var reservationID int
 	err = tx.QueryRow(`
@@ -104,8 +104,8 @@ func createReservation(c *gin.Context) {
 		return
 	}
 
-	// 6. Assign the Seats
-	// It loops through the seats again and permanently links them to Reservation #505.
+	// 6 Assigning the Seats
+	// It loops through the seats again and permanently links them to Reservation #505
 	for _, seatID := range req.SeatIDs {
 		_, err := tx.Exec(`
 			INSERT INTO reserved_seats (reservation_id, seat_id)
@@ -129,11 +129,11 @@ func createReservation(c *gin.Context) {
 
 func listUserReservations(c *gin.Context) {
 
-	// 1. Identity Check: "Who is asking?"
-	// We trust the AuthMiddleware. It already checked the token and put the ID here.
+	// 1 Identity Check: "Who is asking?"
+
 	userID := c.GetInt("user_id")
 
-	// 2. The "Reporter" Query: Gather data from 3 different places.
+	// 2 Gathring data from 3 different places.
 	rows, err := db.DB.Query(`
 		SELECT 
 			r.id, 		--reservation ticket #
@@ -153,20 +153,20 @@ func listUserReservations(c *gin.Context) {
 	}
 	defer rows.Close()
 
-	// 3. The Empty List: Prepare a container for the results.
+	// 3 The Empty List: Preparing a container for the results
 	var results []gin.H
 
-	// 4. The Loop: Process the pile of receipts one by one.
+	// 4 The Loop: Processing the pile of receipts one by one
 	for rows.Next() {
 		var id int
 		var title string
 		var startTime string
 		var status string
 
-		// Scan the 4 columns we asked for in the SELECT statement.
+		// Scanning the 4 columns we asked for in the SELECT statement
 		rows.Scan(&id, &title, &startTime, &status)
 
-		// Add to our list
+		// Adding to our list
 		results = append(results, gin.H{
 			"reservation_id": id,
 			"movie_title":    title,
@@ -175,24 +175,21 @@ func listUserReservations(c *gin.Context) {
 		})
 	}
 
-	// 5. Send the Report
-
 	c.JSON(http.StatusOK, results)
 }
 
 func cancelReservation(c *gin.Context) {
-	// 1. Identify the Target
+	// 1 Identifying the Target
 	// Which reservation are we cancelling? (from URL)
 	resID := c.Param("id")
 	// Who is asking? (from Token)
 	userID := c.GetInt("user_id")
 
-	// 2. Gather Evidence (The Validation Query)
-	// Before we do anything, we need to look up the reservation details.
+	// we need to look up the reservation details for things we want to know like
 	// We need to know:
-	//   a. When is the movie? (showtimeTime) - Used for policy checks (e.g., can't cancel if movie started).
-	//   b. Who owns it? (ownerID) - Security check.
-	//   c. What is the current status? (status) - Logic check.
+	//   a. When is the movie? (showtimeTime) - Used for policy checks (e.g., can't cancel if movie started)
+	//   b. Who owns it? (ownerID) - Security check
+	//   c. What is the current status? (status) - Logic check
 	var showtimeTime time.Time
 	var ownerID int
 	var status string
@@ -217,25 +214,23 @@ func cancelReservation(c *gin.Context) {
 		return
 	}
 
-	// 3. The Security Check ("Is this yours?")
+	// 3 The Security Check ("Is this yours?")
 	// If the ID on the ticket (ownerID) doesn't match the ID in the token (userID),
-	// it means Hacker Bob is trying to cancel Alice's ticket. Block them.
+	// it means some dude is trying to cancel Aj's ticket, Block them
 	if ownerID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "not your reservation"})
 		return
 	}
 
-	// 4. The Logic Check ("Is it valid?")
-	// You can't cancel a ticket that is already cancelled or refunded.
+	// 4 The Logic Check ("Is it valid?")
+	// We can't cancel a ticket that is already cancelled or refunded
 	if status != "BOOKED" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "cannnot cancel"})
 		return
 	}
 
-	// 5. The Action (Soft Delete)
-	// We do NOT use "DELETE FROM". We use "UPDATE".
-	// Why? Because accountants need records! We want to keep the history that
-	// "User X booked this, then cancelled it."
+	// 5. The Action to delete
+
 	_, err = db.DB.Exec(`
 		UPDATE reservations
 		SET status = 'CANCELLED'
